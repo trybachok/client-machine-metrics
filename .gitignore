@@ -1,5 +1,6 @@
 .idea
 .env
+api/log.txt
 # dependencies
 /node_modules
 /.pnp

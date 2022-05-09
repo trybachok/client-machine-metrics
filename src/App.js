@@ -1,9 +1,9 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import UAParser from 'ua-parser-js';
-// import NetworkSpeed from 'network-speed';
 import './App.css';
-import { Buffer } from 'buffer';
-import process from "process";
+import {Buffer} from 'buffer';
+import process from 'process';
+import {downloadSpeedTest, uploadSpeedTest} from './utils/network_speed';
 
 
 window.Buffer = Buffer;
@@ -31,37 +31,31 @@ const calculate = callback => {
     return (t1 - t0).toFixed(0);
 }
 
-// const testNetworkSpeed = new NetworkSpeed();
+const baseUrl = '/api/read.php';
+const fileSizeInBytes = 6705403;
 
-// getNetworkDownloadSpeed();
-//
-// async function getNetworkDownloadSpeed() {
-//     const baseUrl = 'https://filedoge.com/download/c404176fe47bd5207ea582cd6b5d03924086096cfaf9a80cfe7fcfad094eb23c6e4a6608270cd15a2f84';
-//     const fileSizeInBytes = 500000;
-//     const speed = await testNetworkSpeed.checkDownloadSpeed(baseUrl, fileSizeInBytes);
-//     console.log(speed);
-// }
-//
-// getNetworkUploadSpeed();
-//
-// async function getNetworkUploadSpeed() {
-//     const options = {
-//         hostname: 'https://api.filedoge.com/upload',
-//         port: 80,
-//         path: '/catchers/544b09b4599c1d0200000289',
-//         method: 'POST',
-//         headers: {
-//             'Content-Type': 'application/json',
-//         },
-//     };
-//     const fileSizeInBytes = 2000000
-//     const speed = await testNetworkSpeed.checkUploadSpeed(options, fileSizeInBytes);
-//     console.log(speed);
-// }
+const testDownload = async callback => {
+    const {bps, kbps, mbps} = await downloadSpeedTest(baseUrl, fileSizeInBytes);
+    callback({bps, kbps, mbps});
+}
+
+const testUpload = async callback => {
+    const options = {
+        path: '/api/write.php',
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    };
+    const {bps, kbps, mbps} = await uploadSpeedTest(options, fileSizeInBytes);
+    callback({bps, kbps, mbps});
+}
 
 function App() {
 
     const [calculating, setCalculating] = useState(false);
+    const [dSpeed, setDSpeed] = useState(null);
+    const [uSpeed, setUSpeed] = useState(null);
     const [duration, setDuration] = useState(0);
 
     const runCalculating = () => {
@@ -71,19 +65,26 @@ function App() {
         }, 100);
     }
 
+    useEffect(() => {
+        setDSpeed(null);
+        setUSpeed(null);
+        testDownload(setDSpeed);
+        testUpload(setUSpeed);
+    }, []);
+
     return (
         <div className="App">
             {generateMarkup('Клиент (User Agent)', window.navigator.userAgent)}
             {generateMarkup('Название браузера', parser.getBrowser().name)}
             {generateMarkup('Версия браузера', parser.getBrowser().version)}
             {generateMarkup('Архитектура CPU', parser.getCPU().architecture ?? 'не определено')}
-            {generateMarkup('Количество ядер CPU', window.navigator.hardwareConcurrency)}
-            {generateMarkup('Приблизительный объем оперативной памяти в ГиБ', window.navigator.deviceMemory)}
+            {generateMarkup('Количество ядер CPU', window.navigator?.hardwareConcurrency ?? 'не определено')}
+            {generateMarkup('Приблизительный объем оперативной памяти в ГиБ', window.navigator?.deviceMemory ?? 'не определено')}
             {generateMarkup('Название ОС', parser.getOS().name)}
             {generateMarkup('Версия ОС', parser.getOS().version)}
             <hr/>
             <p>
-                Тестовый скрипт: расчет факториала числа.<br/>
+                <b>Тестовый скрипт: расчет факториала числа</b><br/>
                 Количество итераций n-факториала: 100000.<br/>
                 Количество итераций цикла расчёта: 100000.
             </p>
@@ -91,10 +92,24 @@ function App() {
                 <button onClick={runCalculating} disabled={calculating}>Запустить скрипт</button>
             </p>
             {calculating
-                ? <span className="calculating">Выполнение...</span>
-                : <span>Длительность выполнения: <span className="calculating">{duration}</span> милисекунд</span>
+                ? <span className="calculating"> Выполнение...</span>
+                : <span>Длительность выполнения: <span className="calculating">{duration / 1000} сек</span></span>
             }
             <hr/>
+            <p><b>Скачивание и загрузка данных размером 6,39 МБ (6705403 байт):</b></p>
+            <p>Скорость скачивания:
+                {dSpeed === null
+                    ? <span className="calculating"> Выполнение...</span>
+                    : <span id="download" className="calculating">{` ${dSpeed.mbps} МБит/сек`}</span>
+                }
+            </p>
+            <p>
+                Скорость загрузки:
+                {uSpeed === null
+                    ? <span className="calculating"> Выполнение...</span>
+                    : <span id="upload" className="calculating">{` ${uSpeed.mbps} МБит/сек`}</span>
+                }
+            </p>
         </div>
     );
 }
